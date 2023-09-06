@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 int main() {
     int choice;
@@ -15,7 +16,7 @@ int main() {
 
         if (scanf("%d", &choice) != 1 || choice < 1 || choice > 8) {
             // If scanf returns a value other than 1 or if choice is outside the range, it's invalid input
-            while (getchar() != '\n'); // Clear the input buffer
+            while (getchar() != '\n');
             printf("Invalid input. Please enter a valid integer between 1 and 8.\n");
             continue; // Skip the rest of the loop and ask for input again
         }
@@ -70,14 +71,53 @@ int main() {
                     fclose(inputFile);
                     printf("File content appended to main_buffer.\n");
 
-                    //strtok(buffer, "\n"); // Remove the trailing newline character  **in case i used 1 line
+                    //strtok(buffer, "\n"); // Remove the trailing newline character  **in case of use 1 line
                 }
                 break;
             case 5:
                 printf("Current text: %s\n", main_buffer); // Print all info from buffer to console
                 break;
             case 6:
-                printf("You chose Option 6\n");
+
+                char lineIndex[10];
+                int num1, num2;
+
+                printf("Choose line and index (For example: 0 6): ");
+                fgets(lineIndex, sizeof(lineIndex), stdin);
+
+                // Parse the line and index from the input
+                if (sscanf(lineIndex, "%d %d", &num1, &num2) != 2) {
+                    printf("Invalid input format. Please enter line and index as two integers.\n");
+                } else if (num1 < 0 || num2 < 0) {
+                    printf("Line and index values must be non-negative.\n");
+                } else {
+                    // Check if line number exceeds the number of lines in main_buffer
+                    int numLines = 0;
+                    char *tempBuffer = main_buffer;
+                    while (numLines < num1 && (tempBuffer = strchr(tempBuffer, '\n'))) {
+                        tempBuffer++;
+                        numLines++;
+                    }
+
+                    if (numLines < num1) {
+                        printf("Line number exceeds the number of lines in the text.\n");
+                    } else {
+                        // Insert text at the specified line and index
+                        if (num2 > strlen(tempBuffer)) {
+                            printf("Index exceeds the length of the line.\n");
+                        } else {
+                            printf("Enter text to insert: ");
+                            fgets(buffer, sizeof(buffer), stdin);
+                            strtok(buffer, "\n"); // Remove \n
+
+                            // Insert the text at the specified position
+                            char *insertPosition = main_buffer + (tempBuffer - main_buffer) + num2;
+                            memmove(insertPosition + strlen(buffer), insertPosition, strlen(insertPosition) + 1);
+                            strncpy(insertPosition, buffer, strlen(buffer));
+                            printf("Text inserted.\n");
+                        }
+                    }
+                }
                 break;
             case 7:
                 printf("You chose Option 7\n");
