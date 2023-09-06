@@ -74,7 +74,7 @@ int main() {
                 }
                 break;
             case 5:
-                printf("You chose Option 5\n");
+                printf("Current text: %s\n", main_buffer); // Print all info from buffer to console
                 break;
             case 6:
                 printf("You chose Option 6\n");
