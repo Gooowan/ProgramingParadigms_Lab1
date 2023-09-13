@@ -9,7 +9,7 @@ int main() {
     char fileName[30];
     char main_buffer[400] = ""; // Initialize main_buffer as an empty string
 
-    memset(buffer, 0, sizeof(buffer));
+    memset(buffer, 0, sizeof(buffer)); // Clear a buffer
 
     do {
         printf("Enter the command: ");
@@ -145,19 +145,14 @@ int main() {
 
 
             case 8:{
-                #ifdef _WIN32
-                    system("cls");
-                #else
-                    system("clear");
-                #endif
-                    printf("Exiting the program\n");
+                system("clear");
             }
                 break;
 
             default:
                 break;
         }
-    } while (choice != 8);
+    } while (choice != 9);
 
     return 0;
 }
