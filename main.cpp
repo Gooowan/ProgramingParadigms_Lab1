@@ -14,11 +14,10 @@ int main() {
     do {
         printf("Enter the command: ");
 
-        if (scanf("%d", &choice) != 1 || choice < 1 || choice > 9) {
-            // If scanf returns a value other than 1 or if choice is outside the range, it's invalid input
+        if (scanf("%d", &choice) != 1 || choice < 1 || choice > 9) { // first - len, next two - about limit of commands
             while (getchar() != '\n');
             printf("Invalid input. Please enter a valid integer between 1 and 8.\n");
-            continue; // Skip the rest of the loop and ask for input again
+            continue; // Skip the rest of the loop, input again
         }
 
         getchar(); // Consume the newline character
@@ -33,7 +32,7 @@ int main() {
                 break;
             case 2:
                 if (main_buffer[0] != '\0') {
-                    strcat(main_buffer, "\n"); // Add a new line if main_buffer is not empty
+                    strcat(main_buffer, "\n"); // Add a new line if main_buffer is not empty,
                 }
                 printf("You have successfully started a new line! \n");
                 break;
