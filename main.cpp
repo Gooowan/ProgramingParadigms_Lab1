@@ -6,13 +6,27 @@ int choice;
 char buffer[100];
 FILE *inputFile;
 char fileName[30];
-char main_buffer[400] = ""; // Initialize main_buffer as an empty string
+char* main_buffer = NULL; // Initialize main_buffer as a NULL pointer
+size_t main_buffer_size = 0; // Initialize the main_buffer size
 
 int case1() {
     printf("Enter text to append: ");
     fgets(buffer, sizeof(buffer), stdin);
     strtok(buffer, "\n"); // Remove the trailing newline character
-    strcat(main_buffer, buffer); // Append buffer to main_buffer
+
+    size_t new_len = main_buffer_size + strlen(buffer) + 1;
+    main_buffer = (char*) realloc(main_buffer, new_len);
+    if (main_buffer == NULL) {
+        printf("Memory allocation error\n");
+        return -1;
+    }
+    if (main_buffer_size == 0) {
+        strcpy(main_buffer, buffer); // If it is the first allocation, use strcpy
+    } else {
+        strcat(main_buffer, buffer); // Append buffer to main_buffer
+    }
+    main_buffer_size = new_len;
+
     printf("Whole text now: %s\n", main_buffer);
     return 0;
 };
@@ -42,28 +56,55 @@ int case3() {
     } else {
         printf("Error opening file\n");
     }
-    memset(main_buffer, 0, sizeof(main_buffer));
+    if (main_buffer != NULL){
+        memset(main_buffer, 0, sizeof(main_buffer));
+    }
     return 0;
 };
 
 int case4() {
     printf("Enter your file name to open: ");
     fgets(fileName, sizeof(fileName), stdin);
-    inputFile = fopen(fileName, "r"); // Use "r" for reading
+    strtok(fileName, "\n"); // Remove newline character from fileName
+
+    inputFile = fopen(fileName, "r"); // Open file in read mode using the user-provided fileName
     if (inputFile == NULL) {
-        printf("Error opening file\n");
+        perror("Error opening file");
+        return -1;
     } else {
+        char tempBuffer[100];
         // Read and append the entire file content
-        while (fgets(buffer, sizeof(buffer), inputFile) != NULL) {
-            strcat(main_buffer, buffer); // Append each line to main_buffer
+        while (fgets(tempBuffer, sizeof(tempBuffer), inputFile) != NULL) {
+            char *pos;
+            if ((pos = strchr(tempBuffer, '\n')) != NULL)
+                *pos = '\n'; // Replacing newline character
+
+            size_t new_len = main_buffer_size + strlen(tempBuffer) + 1; // Adding 1 for the null terminator
+            char* new_buffer = (char*) realloc(main_buffer, new_len);
+            if (new_buffer == NULL) {
+                printf("Memory allocation error\n");
+                fclose(inputFile);
+                free(main_buffer); // Free the previously allocated memory
+                return -1;
+            }
+
+            main_buffer = new_buffer;
+            if(main_buffer_size == 0) {
+                strcpy(main_buffer, tempBuffer); // Copy buffer to main_buffer since it is the first time
+            } else {
+                strcat(main_buffer, tempBuffer); // Append buffer to main_buffer for subsequent lines
+            }
+            main_buffer_size = new_len;
         }
         fclose(inputFile);
         printf("File content appended to main_buffer.\n");
-
-        //strtok(buffer, "\n"); // Remove the trailing newline character  **in case of use 1 line
     }
     return 0;
-};
+}
+
+
+
+
 
 int case6(){
     char lineIndex[10];
