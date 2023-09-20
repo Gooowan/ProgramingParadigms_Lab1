@@ -2,12 +2,145 @@
 #include <string.h>
 #include <stdlib.h>
 
+int choice;
+char buffer[100];
+FILE *inputFile;
+char fileName[30];
+char main_buffer[400] = ""; // Initialize main_buffer as an empty string
+
+int case1() {
+    printf("Enter text to append: ");
+    fgets(buffer, sizeof(buffer), stdin);
+    strtok(buffer, "\n"); // Remove the trailing newline character
+    strcat(main_buffer, buffer); // Append buffer to main_buffer
+    printf("Whole text now: %s\n", main_buffer);
+    return 0;
+};
+
+int case2() {
+    if (main_buffer[0] != '\0') {
+        strcat(main_buffer, "\n"); // Add a new line if main_buffer is not empty,
+    }
+    printf("You have successfully started a new line! \n");
+    return 0;
+};
+
+int case3() {
+    printf("Enter your file name to save your buffer: ");
+    fgets(fileName, sizeof(fileName), stdin);
+
+    char *newline = strtok(fileName, "\n");
+    if (newline != NULL) {
+        strcpy(fileName, newline); // Use strcpy instead of assignment
+    }
+
+    inputFile = fopen(fileName, "w");
+    if (inputFile != NULL) {
+        fputs(main_buffer, inputFile);
+        fclose(inputFile);
+        printf("Saved successfully\n");
+    } else {
+        printf("Error opening file\n");
+    }
+    memset(main_buffer, 0, sizeof(main_buffer));
+    return 0;
+};
+
+int case4() {
+    printf("Enter your file name to open: ");
+    fgets(fileName, sizeof(fileName), stdin);
+    inputFile = fopen(fileName, "r"); // Use "r" for reading
+    if (inputFile == NULL) {
+        printf("Error opening file\n");
+    } else {
+        // Read and append the entire file content
+        while (fgets(buffer, sizeof(buffer), inputFile) != NULL) {
+            strcat(main_buffer, buffer); // Append each line to main_buffer
+        }
+        fclose(inputFile);
+        printf("File content appended to main_buffer.\n");
+
+        //strtok(buffer, "\n"); // Remove the trailing newline character  **in case of use 1 line
+    }
+    return 0;
+};
+
+int case6(){
+    char lineIndex[10];
+    int num1, num2;
+
+    printf("Choose line and index (For example: 0 6): ");
+    fgets(lineIndex, sizeof(lineIndex), stdin);
+
+    // Parse the line and index from the input
+    if (sscanf(lineIndex, "%d %d", &num1, &num2) != 2) {
+        printf("Invalid input format. Please enter line and index as two integers.\n");
+    } else if (num1 < 0 || num2 < 0) {
+        printf("Line and index values must be non-negative.\n");
+    } else {
+        // Check if line number exceeds the number of lines in main_buffer
+        int numLines = 0;
+        char *tempBuffer = main_buffer;
+        while (numLines < num1 && (tempBuffer = strchr(tempBuffer, '\n'))) {
+            tempBuffer++;
+            numLines++;
+        }
+
+        if (numLines < num1) {
+            printf("Line number exceeds the number of lines in the text.\n");
+        } else {
+            // Insert text at the specified line and index
+            if (num2 > strlen(tempBuffer)) {
+                printf("Index exceeds the length of the line.\n");
+            } else {
+                printf("Enter text to insert: ");
+                fgets(buffer, sizeof(buffer), stdin);
+                strtok(buffer, "\n"); // Remove \n
+
+                // Insert the text at the specified position
+                char *insertPosition = main_buffer + (tempBuffer - main_buffer) + num2;
+                memmove(insertPosition + strlen(buffer), insertPosition, strlen(insertPosition) + 1);
+                strncpy(insertPosition, buffer, strlen(buffer));
+                printf("Text inserted.\n");
+            }
+        }
+    }
+    return 0;
+}
+
+int case7(){
+    printf("Enter word to find: ");
+    fgets(buffer, sizeof(buffer), stdin);
+    strtok(buffer, "\n"); // Remove the trailing newline character
+
+    char *searchPosition = main_buffer;
+    int found = 0;
+
+    // Loop to search for the word in the main_buffer
+    while ((searchPosition = strstr(searchPosition, buffer)) != NULL) {
+        // Count the line number
+        int lineCount = 1; // Start counting from 1
+        for (char *ptr = main_buffer; ptr < searchPosition; ptr++) {
+            if (*ptr == '\n') {
+                lineCount++;
+            }
+        }
+
+        printf("Word found at position: %d, on line: %d\n", (int) (searchPosition - main_buffer),
+               lineCount);
+        found = 1;
+        // Move searchPosition to the next character to continue searching
+        searchPosition++;
+    }
+
+    if (!found) {
+        printf("Word not found in the text.\n");
+    }
+    return 0;
+}
+
 int main() {
-    int choice;
-    char buffer[100];
-    FILE *inputFile;
-    char fileName[30];
-    char main_buffer[400] = ""; // Initialize main_buffer as an empty string
+
 
     memset(buffer, 0, sizeof(buffer)); // Clear a buffer
 
@@ -24,121 +157,25 @@ int main() {
 
         switch (choice) {
             case 1:
-                printf("Enter text to append: ");
-                fgets(buffer, sizeof(buffer), stdin);
-                strtok(buffer, "\n"); // Remove the trailing newline character
-                strcat(main_buffer, buffer); // Append buffer to main_buffer
-                printf("Whole text now: %s\n", main_buffer);
+                case1(); //Appending a text to the end
                 break;
             case 2:
-                if (main_buffer[0] != '\0') {
-                    strcat(main_buffer, "\n"); // Add a new line if main_buffer is not empty,
-                }
-                printf("You have successfully started a new line! \n");
+                case2(); // New line
                 break;
             case 3:
-                printf("Enter your file name to save your buffer: ");
-                fgets(fileName, sizeof(fileName), stdin);
-                inputFile = fopen(fileName, "w");
-                if (inputFile != NULL) {
-                    fputs(main_buffer, inputFile);
-                    fclose(inputFile);
-                    printf("Saved successfully\n");
-                } else {
-                    printf("Error opening file\n");
-                }
-                memset(main_buffer, 0, sizeof(main_buffer));
+                case3(); //writing in file
                 break;
             case 4:
-                printf("Enter your file name to open: ");
-                fgets(fileName, sizeof(fileName), stdin);
-                inputFile = fopen(fileName, "r"); // Use "r" for reading
-                if (inputFile == NULL) {
-                    printf("Error opening file\n");
-                } else {
-                    // Read and append the entire file content
-                    while (fgets(buffer, sizeof(buffer), inputFile) != NULL) {
-                        strcat(main_buffer, buffer); // Append each line to main_buffer
-                    }
-                    fclose(inputFile);
-                    printf("File content appended to main_buffer.\n");
-
-                    //strtok(buffer, "\n"); // Remove the trailing newline character  **in case of use 1 line
-                }
+                case4(); //reading from file
                 break;
             case 5:
                 printf("Current text: %s\n", main_buffer); // Print all info from buffer to console
                 break;
             case 6:
-
-                char lineIndex[10];
-                int num1, num2;
-
-                printf("Choose line and index (For example: 0 6): ");
-                fgets(lineIndex, sizeof(lineIndex), stdin);
-
-                // Parse the line and index from the input
-                if (sscanf(lineIndex, "%d %d", &num1, &num2) != 2) {
-                    printf("Invalid input format. Please enter line and index as two integers.\n");
-                } else if (num1 < 0 || num2 < 0) {
-                    printf("Line and index values must be non-negative.\n");
-                } else {
-                    // Check if line number exceeds the number of lines in main_buffer
-                    int numLines = 0;
-                    char *tempBuffer = main_buffer;
-                    while (numLines < num1 && (tempBuffer = strchr(tempBuffer, '\n'))) {
-                        tempBuffer++;
-                        numLines++;
-                    }
-
-                    if (numLines < num1) {
-                        printf("Line number exceeds the number of lines in the text.\n");
-                    } else {
-                        // Insert text at the specified line and index
-                        if (num2 > strlen(tempBuffer)) {
-                            printf("Index exceeds the length of the line.\n");
-                        } else {
-                            printf("Enter text to insert: ");
-                            fgets(buffer, sizeof(buffer), stdin);
-                            strtok(buffer, "\n"); // Remove \n
-
-                            // Insert the text at the specified position
-                            char *insertPosition = main_buffer + (tempBuffer - main_buffer) + num2;
-                            memmove(insertPosition + strlen(buffer), insertPosition, strlen(insertPosition) + 1);
-                            strncpy(insertPosition, buffer, strlen(buffer));
-                            printf("Text inserted.\n");
-                        }
-                    }
-                }
+                case6();
                 break;
             case 7: {
-                printf("Enter word to find: ");
-                fgets(buffer, sizeof(buffer), stdin);
-                strtok(buffer, "\n"); // Remove the trailing newline character
-
-                char *searchPosition = main_buffer;
-                int found = 0;
-
-                // Loop to search for the word in the main_buffer
-                while ((searchPosition = strstr(searchPosition, buffer)) != NULL) {
-                    // Count the line number
-                    int lineCount = 1; // Start counting from 1
-                    for (char *ptr = main_buffer; ptr < searchPosition; ptr++) {
-                        if (*ptr == '\n') {
-                            lineCount++;
-                        }
-                    }
-
-                    printf("Word found at position: %d, on line: %d\n", (int) (searchPosition - main_buffer),
-                           lineCount);
-                    found = 1;
-                    // Move searchPosition to the next character to continue searching
-                    searchPosition++;
-                }
-
-                if (!found) {
-                    printf("Word not found in the text.\n");
-                }
+                case7();
             }
                 break;
 

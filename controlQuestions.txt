@@ -1,0 +1,88 @@
+1. What is structural programming paradigm?
+
+The structural (or structured) programming paradigm is a programming paradigm that emphasizes
+a logical structure in the program's code. It encourages the breaking down of complex tasks into
+simpler, manageable sub-tasks using concepts like sequences, loops, and conditionals.
+This paradigm helps in writing clear and understandable code by following a top-down design approach.
+Popularized in the 1960s and 1970s, it is founded on the concepts of structured design and
+structured programming.
+
+
+2. What is procedural programming paradigm?
+
+Procedural programming is a programming paradigm that relies on procedure calls to write
+well-structured and modular code. It is based on the concept of procedure call, where you can
+define code as reusable functions or procedures. These procedures contain a series of
+computational steps to be carried out. Any given procedure might be called at any point during
+a program's execution, including by other procedures or itself. A procedural program generally
+has a clearly defined flow of control, and procedures can manipulate variables, which are scoped
+to the procedure or global.
+
+
+3. Which primitive data types do you know? Key differences between them?
+
+Primitive data types are the basic data types that are built into a programming language.
+The common primitive data types are:
+
+Integer: Stores whole numbers, without decimals. They can be both positive and negative.
+Float: Represents real numbers, containing a decimal point or an exponent.
+Character: Stores individual characters.
+Boolean: Represents truth values, generally true or false.
+String: Though not a primitive data type in every language, it represents a sequence of characters.
+
+The key differences between these data types are their storage requirements and the kind of
+data they can store.
+
+
+4. Which segments does the process memory have?
+The memory of a process is typically divided into several segments, which are:
+
+Text Segment: Contains the executable code of the program.
+Data Segment: Stores global and static variables.
+Heap Segment: Used for dynamic memory allocation, where variables are allocated and freed at runtime.
+Stack Segment: Used for function call management. It stores local variables, return addresses,
+and performs process execution control.
+BSS Segment (Block Started by Symbol): Stores uninitialized global and static variables.
+
+
+5. What is the virtual memory space?
+
+Virtual memory space is a memory management technique that provides an "idealized abstraction
+of the storage resources that are actually available on a physical machine." It allows a program
+to be designed as though there is only one kind of memory, "a contiguous array of addressable
+storage," regardless of the memory types available. This "idealized abstraction" hides "the complex
+physical storage," which can comprise main memory (RAM), the disk storage, and other memory types
+from the program, making programming easier.
+
+
+6. How to allocate the memory in each segment?
+
+Text Segment: The memory in this segment is usually allocated by the operating system when
+the program is loaded into memory.
+Data Segment: Memory in this segment is allocated for global and static variables when the
+program is compiled.
+Heap Segment: Memory is allocated dynamically at runtime using functions like malloc() in
+C or new in C++.
+Stack Segment: Memory is allocated automatically when a function is called, and local
+variables are declared.
+BSS Segment: Memory is reserved when the program is compiled, but the actual allocation
+happens at runtime.
+
+
+7. How to reallocate the memory in case we don’t have enough space?
+
+In case you don't have enough space, you can reallocate memory, especially in the heap segment,
+using functions such as realloc() in C which allows you to allocate a new portion of memory with
+a different size, copying the old content and freeing the old space. It is also advisable to
+monitor memory usage and free up memory that is no longer needed using functions like free() in C.
+
+
+8. What is a runtime stack?
+
+A runtime stack, also known simply as the "stack," is a region of memory in a program's process
+that is used to store local variables, function parameters, return addresses, and to control the
+execution flow of the program. It operates on a Last In, First Out (LIFO) principle, which means
+that the last item to be placed on the stack is the first to be removed. When a function is called,
+its local variables and return address are pushed onto the stack, and they are popped off the stack
+when the function returns. The stack helps in keeping track of the point to which each active
+subroutine should return control when it finishes executing.
