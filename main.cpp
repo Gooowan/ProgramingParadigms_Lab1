@@ -1,15 +1,54 @@
 #include <stdio.h>
-#include <string.h>
+#include <string>
 #include <stdlib.h>
 
-int choice;
-char buffer[100];
-FILE *inputFile;
-char fileName[30];
-char* main_buffer = NULL; // Initialize main_buffer as a NULL pointer
-size_t main_buffer_size = 0; // Initialize the main_buffer size
+using namespace std;
 
-int case1() {
+class User_Input {
+public:
+    static int getIntChoice() {
+        char input[10];
+        fgets(input, sizeof(input), stdin);
+        return atoi(input);  // Convert string to integer
+    }
+
+    static void getStringInput(char* buffer, size_t bufferSize) {
+        fgets(buffer, bufferSize, stdin);
+        strtok(buffer, "\n");  // Remove the trailing newline character
+    }
+
+    static void getFileName(char* fileName, size_t fileSize) {
+        printf("Enter your file name: ");
+        getStringInput(fileName, fileSize);
+    }
+
+    static void clearConsole() {
+        system("clear");
+    }
+};
+
+class Main_buffer {
+private:
+    char buffer[100];
+    char* main_buffer = NULL;
+    size_t main_buffer_size = 0;
+    FILE* inputFile;
+    char fileName[30];
+
+public:
+    Main_buffer() {}
+    void appendLine();
+    void appendNewLine();
+    void writeIntoFile();
+    void readingFromFile();
+    void printingBuffer();
+    void insertInText();
+    void searchInText();
+    void clearingConsole();
+    void deleteText();
+};
+
+void Main_buffer::appendLine() {
     printf("Enter text to append: ");
     fgets(buffer, sizeof(buffer), stdin);
     strtok(buffer, "\n"); // Remove the trailing newline character
@@ -18,7 +57,6 @@ int case1() {
     main_buffer = (char*) realloc(main_buffer, new_len);
     if (main_buffer == NULL) {
         printf("Memory allocation error\n");
-        return -1;
     }
     if (main_buffer_size == 0) {
         strcpy(main_buffer, buffer); // If it is the first allocation, use strcpy
@@ -28,64 +66,59 @@ int case1() {
     main_buffer_size = new_len;
 
     printf("Whole text now: %s\n", main_buffer);
-    return 0;
 };
 
-int case2() {
-    if (main_buffer[0] != '\0') {
-        strcat(main_buffer, "\n"); // Add a new line if main_buffer is not empty,
-    }
+void Main_buffer::appendNewLine() {
+
+    strcat(main_buffer, "\n"); // Add a new line if main_buffer is not empty,
+
     printf("You have successfully started a new line! \n");
-    return 0;
 };
 
-int case3() {
+void Main_buffer::writeIntoFile() {
     printf("Enter your file name to save your buffer: ");
     fgets(fileName, sizeof(fileName), stdin);
 
     char *newline = strtok(fileName, "\n");
-    if (newline != NULL) {
+    if (newline != nullptr) {
         strcpy(fileName, newline); // Use strcpy instead of assignment
     }
 
     inputFile = fopen(fileName, "w");
-    if (inputFile != NULL) {
+    if (inputFile != nullptr) {
         fputs(main_buffer, inputFile);
         fclose(inputFile);
         printf("Saved successfully\n");
     } else {
         printf("Error opening file\n");
     }
-    if (main_buffer != NULL){
+    if (main_buffer != nullptr){
         memset(main_buffer, 0, sizeof(main_buffer));
     }
-    return 0;
 };
 
-int case4() {
+void Main_buffer::readingFromFile() {
     printf("Enter your file name to open: ");
     fgets(fileName, sizeof(fileName), stdin);
     strtok(fileName, "\n"); // Remove newline character from fileName
 
     inputFile = fopen(fileName, "r"); // Open file in read mode using the user-provided fileName
-    if (inputFile == NULL) {
+    if (inputFile == nullptr) {
         perror("Error opening file");
-        return -1;
     } else {
         char tempBuffer[100];
         // Read and append the entire file content
-        while (fgets(tempBuffer, sizeof(tempBuffer), inputFile) != NULL) {
+        while (fgets(tempBuffer, sizeof(tempBuffer), inputFile) != nullptr) {
             char *pos;
-            if ((pos = strchr(tempBuffer, '\n')) != NULL)
+            if ((pos = strchr(tempBuffer, '\n')) != nullptr)
                 *pos = '\n'; // Replacing newline character
 
             size_t new_len = main_buffer_size + strlen(tempBuffer) + 1; // Adding 1 for the null terminator
             char* new_buffer = (char*) realloc(main_buffer, new_len);
-            if (new_buffer == NULL) {
+            if (new_buffer == nullptr) {
                 printf("Memory allocation error\n");
                 fclose(inputFile);
                 free(main_buffer); // Free the previously allocated memory
-                return -1;
             }
 
             main_buffer = new_buffer;
@@ -99,14 +132,13 @@ int case4() {
         fclose(inputFile);
         printf("File content appended to main_buffer.\n");
     }
-    return 0;
 }
 
+void Main_buffer::printingBuffer(){
+    printf("Current text: %s\n", main_buffer);
+}
 
-
-
-
-int case6(){
+void Main_buffer::insertInText(){
     char lineIndex[10];
     int num1, num2;
 
@@ -146,10 +178,9 @@ int case6(){
             }
         }
     }
-    return 0;
 }
 
-int case7(){
+void Main_buffer::searchInText(){
     printf("Enter word to find: ");
     fgets(buffer, sizeof(buffer), stdin);
     strtok(buffer, "\n"); // Remove the trailing newline character
@@ -160,7 +191,7 @@ int case7(){
     // Loop to search for the word in the main_buffer
     while ((searchPosition = strstr(searchPosition, buffer)) != NULL) {
         // Count the line number
-        int lineCount = 1; // Start counting from 1
+        int lineCount = 1;
         for (char *ptr = main_buffer; ptr < searchPosition; ptr++) {
             if (*ptr == '\n') {
                 lineCount++;
@@ -170,66 +201,122 @@ int case7(){
         printf("Word found at position: %d, on line: %d\n", (int) (searchPosition - main_buffer),
                lineCount);
         found = 1;
-        // Move searchPosition to the next character to continue searching
+
         searchPosition++;
     }
 
     if (!found) {
         printf("Word not found in the text.\n");
     }
-    return 0;
 }
+
+void Main_buffer::clearingConsole(){
+    system("clear");
+}
+
+void Main_buffer::deleteText(){
+    int lineNumber, index, numSymbols;
+
+    // Get line number, index, and number of symbols from the user
+    printf("Enter line number: ");
+    scanf("%d", &lineNumber);
+    getchar();  // Clear the buffer
+
+    printf("Enter index on that line: ");
+    scanf("%d", &index);
+    getchar();  // Clear the buffer
+
+    printf("Enter number of symbols to delete: ");
+    scanf("%d", &numSymbols);
+    getchar();  // Clear the buffer
+
+    char *lineStart = main_buffer;
+    for (int i = 0; i < lineNumber; i++) {
+        lineStart = strchr(lineStart, '\n');
+        if (!lineStart) {
+            printf("Line number exceeds the number of lines in the text.\n");
+            return;
+        }
+        lineStart++;  // Move past the newline character
+    }
+
+    char *deleteStart = lineStart + index;
+    if (deleteStart >= main_buffer + main_buffer_size) {
+        printf("Specified index is out of bounds.\n");
+        return;
+    }
+
+    char *deleteEnd = deleteStart + numSymbols;
+    if (deleteEnd > main_buffer + main_buffer_size) {
+        deleteEnd = main_buffer + main_buffer_size;
+    }
+
+    // Move the text after deleteEnd to the location of deleteStart
+    memmove(deleteStart, deleteEnd, main_buffer + main_buffer_size - deleteEnd);
+
+    // Adjust the size of the main_buffer
+    main_buffer_size -= (deleteEnd - deleteStart);
+
+    // Null terminate the main_buffer
+    main_buffer[main_buffer_size] = '\0';
+
+    printf("Text deleted successfully.\n");
+
+    printf("Whole text now: %s\n", main_buffer);
+}
+
+class Program_Cycle {
+public:
+    void run() {
+        Main_buffer bufferInstance;
+        int choice;
+
+        do {
+            printf("Enter the command: ");
+            choice = User_Input::getIntChoice();
+
+            if (choice < 1 || choice > 10) {
+                printf("Invalid input. Please enter a valid integer between 1 and 9.\n");
+                continue;
+            }
+
+            switch (choice) {
+                case 1:
+                    bufferInstance.appendLine();
+                    break;
+                case 2:
+                    bufferInstance.appendNewLine();
+                    break;
+                case 3:
+                    bufferInstance.writeIntoFile();
+                    break;
+                case 4:
+                    bufferInstance.readingFromFile();
+                    break;
+                case 5:
+                    bufferInstance.printingBuffer();
+                    break;
+                case 6:
+                    bufferInstance.insertInText();
+                    break;
+                case 7:
+                    bufferInstance.searchInText();
+                    break;
+                case 8:
+                    bufferInstance.clearingConsole();
+                    break;
+                case 9:
+                    bufferInstance.deleteText();
+                    break;
+                default:
+                    break;
+            }
+        } while (choice != 0);
+    }
+};
 
 int main() {
-
-
-    memset(buffer, 0, sizeof(buffer)); // Clear a buffer
-
-    do {
-        printf("Enter the command: ");
-
-        if (scanf("%d", &choice) != 1 || choice < 1 || choice > 9) { // first - len, next two - about limit of commands
-            while (getchar() != '\n');
-            printf("Invalid input. Please enter a valid integer between 1 and 8.\n");
-            continue; // Skip the rest of the loop, input again
-        }
-
-        getchar(); // Consume the newline character
-
-        switch (choice) {
-            case 1:
-                case1(); //Appending a text to the end
-                break;
-            case 2:
-                case2(); // New line
-                break;
-            case 3:
-                case3(); //writing in file
-                break;
-            case 4:
-                case4(); //reading from file
-                break;
-            case 5:
-                printf("Current text: %s\n", main_buffer); // Print all info from buffer to console
-                break;
-            case 6:
-                case6();
-                break;
-            case 7: {
-                case7();
-            }
-                break;
-
-
-            case 8:{
-                system("clear");
-            }
-                break;
-
-            default:
-                break;
-        }
-    } while (choice != 9);
-
+    Program_Cycle program;
+    program.run();
     return 0;
-}
+};
