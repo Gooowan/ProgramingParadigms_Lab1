@@ -34,6 +34,7 @@ private:
     size_t main_buffer_size = 0;
     FILE* inputFile;
     char fileName[30];
+    char clipboard[100] = "";
 
 public:
     Main_buffer() {}
@@ -47,6 +48,10 @@ public:
     void clearingConsole();
     void deleteText();
     void insertText();
+    void cut();
+    void copy();
+    void paste();
+    char* getPosFromLineAndIndex(int a, int b);
 };
 
 void Main_buffer::appendLine() {
@@ -230,15 +235,8 @@ void Main_buffer::deleteText(){
         printf("Line and index values must be non-negative.\n");
     } else {
 
-        char *lineStart = main_buffer;
-        for (int i = 0; i < lineNumber; i++) {
-            lineStart = strchr(lineStart, '\n');
-            if (!lineStart) {
-                printf("Line number exceeds the number of lines in the text.\n");
-                return;
-            }
-            lineStart++;  // Move past the newline character
-        }
+        char *lineStart = getPosFromLineAndIndex(lineNumber, index);
+        if (!lineStart) return;
 
         char *deleteStart = lineStart + index;
         if (deleteStart >= main_buffer + main_buffer_size) {
@@ -279,25 +277,8 @@ void Main_buffer::insertText() {
         return;
     }
 
-    // Navigate to the specified line
-    char *lineStart = main_buffer;
-    for (int i = 0; i < lineNumber; i++) {
-        lineStart = strchr(lineStart, '\n');
-        if (!lineStart) {
-            printf("Line number exceeds the number of lines in the text.\n");
-            return;
-        }
-        lineStart++;
-    }
-
-    // Navigate to the specified index within the line
-    char *insertStart = lineStart + index;
-
-    // Ensure the insert start is within the bounds
-    if (insertStart >= main_buffer + main_buffer_size) {
-        printf("Specified index is out of bounds.\n");
-        return;
-    }
+    char *insertStart = getPosFromLineAndIndex(lineNumber, index);
+    if (!insertStart) return;
 
     printf("Write text: ");
     fgets(buffer, sizeof(buffer), stdin);
@@ -315,6 +296,91 @@ void Main_buffer::insertText() {
     printf("Text replaced.\n");
 }
 
+void Main_buffer::cut() {
+    char lineIndex[10];
+    int lineNumber, index, numSymbols;
+
+    printf("Enter line number, index, number of symbols to cut : ");
+    fgets(lineIndex, sizeof(lineIndex), stdin);
+
+    if (sscanf(lineIndex, "%d %d %d", &lineNumber, &index, &numSymbols) != 3) {
+        printf("Invalid input format. Please enter line and index as two integers.\n");
+        return;
+    }
+
+    char *startPos = getPosFromLineAndIndex(lineNumber, index);
+    if (!startPos) return;
+
+    strncpy(clipboard, startPos, numSymbols);
+    clipboard[numSymbols] = '\0';  // Null-terminate clipboard
+
+    // Shift the remaining text in the main_buffer to delete the cut portion
+    memmove(startPos, startPos + numSymbols, strlen(startPos + numSymbols) + 1);
+    printf("Text cut to clipboard: %s\n", clipboard);
+}
+
+void Main_buffer::copy() {
+    char lineIndex[10];
+    int lineNumber, index, numSymbols;
+
+    printf("Enter line number, index, number of symbols to copy : ");
+    fgets(lineIndex, sizeof(lineIndex), stdin);
+
+    if (sscanf(lineIndex, "%d %d %d", &lineNumber, &index, &numSymbols) != 3) {
+        printf("Invalid input format. Please enter line and index as two integers.\n");
+        return;
+    }
+
+    char *startPos = getPosFromLineAndIndex(lineNumber, index);
+    if (!startPos) return;
+
+    strncpy(clipboard, startPos, numSymbols);
+    clipboard[numSymbols] = '\0';  // Null-terminate clipboard
+
+    printf("Text copied to clipboard: %s\n", clipboard);
+}
+
+void Main_buffer::paste() {
+    char lineIndex[10];
+    int lineNumber, index;
+
+    printf("Enter line number and index to paste at: ");
+    fgets(lineIndex, sizeof(lineIndex), stdin);
+
+    if (sscanf(lineIndex, "%d %d", &lineNumber, &index) != 2) {
+        printf("Invalid input format. Please enter line and index as two integers.\n");
+        return;
+    }
+
+    char *insertPos = getPosFromLineAndIndex(lineNumber, index);
+    if (!insertPos) return;
+
+    // Move the remaining text in main_buffer to make space for the paste
+    memmove(insertPos + strlen(clipboard), insertPos, strlen(insertPos) + 1);
+    strncpy(insertPos, clipboard, strlen(clipboard));
+
+    printf("Text pasted from clipboard: %s\n", clipboard);
+}
+
+char *Main_buffer::getPosFromLineAndIndex(int lineNumber, int index) {
+    char *lineStart = main_buffer;
+    for (int i = 0; i < lineNumber; i++) {
+        lineStart = strchr(lineStart, '\n');
+        if (!lineStart) {
+            printf("Line number exceeds the number of lines in the text.\n");
+            return nullptr;
+        }
+        lineStart++;
+    }
+
+    char *pos = lineStart + index;
+    if (pos > main_buffer + main_buffer_size) {
+        printf("Specified index is out of bounds.\n");
+        return nullptr;
+    }
+
+    return pos;
+}
 
 
 class Program {
@@ -323,11 +389,12 @@ public:
         Main_buffer bufferInstance;
         int choice;
 
+
         do {
             printf("Enter the command: ");
             choice = User_Input::getIntChoice();
 
-            if (choice < 1 || choice > 10) {
+            if (choice < 1 || choice > 13) {
                 printf("Invalid input. Please enter a valid integer between 1 and 9.\n");
                 continue;
             }
@@ -362,6 +429,15 @@ public:
                     break;
                 case 10:
                     bufferInstance.insertText();
+                    break;
+                case 11:
+                    bufferInstance.cut();
+                    break;
+                case 12:
+                    bufferInstance.copy();
+                    break;
+                case 13:
+                    bufferInstance.paste();
                     break;
                 default:
                     break;
