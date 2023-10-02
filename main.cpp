@@ -46,6 +46,7 @@ public:
     void searchInText();
     void clearingConsole();
     void deleteText();
+    void insertText();
 };
 
 void Main_buffer::appendLine() {
@@ -215,21 +216,70 @@ void Main_buffer::clearingConsole(){
 }
 
 void Main_buffer::deleteText(){
+    char lineIndex[10];
     int lineNumber, index, numSymbols;
 
     // Get line number, index, and number of symbols from the user
-    printf("Enter line number: ");
-    scanf("%d", &lineNumber);
-    getchar();  // Clear the buffer
+    printf("Enter line number, index, number of symbols to delete : ");
+    fgets(lineIndex, sizeof(lineIndex), stdin);
 
-    printf("Enter index on that line: ");
-    scanf("%d", &index);
-    getchar();  // Clear the buffer
+    // Parse the line and index from the input
+    if (sscanf(lineIndex, "%d %d %d", &lineNumber, &index, &numSymbols) != 3) {
+        printf("Invalid input format. Please enter line and index as two integers.\n");
+    } else if (lineNumber < 0 || index < 0 || numSymbols < 0) {
+        printf("Line and index values must be non-negative.\n");
+    } else {
 
-    printf("Enter number of symbols to delete: ");
-    scanf("%d", &numSymbols);
-    getchar();  // Clear the buffer
+        char *lineStart = main_buffer;
+        for (int i = 0; i < lineNumber; i++) {
+            lineStart = strchr(lineStart, '\n');
+            if (!lineStart) {
+                printf("Line number exceeds the number of lines in the text.\n");
+                return;
+            }
+            lineStart++;  // Move past the newline character
+        }
 
+        char *deleteStart = lineStart + index;
+        if (deleteStart >= main_buffer + main_buffer_size) {
+            printf("Specified index is out of bounds.\n");
+            return;
+        }
+
+        char *deleteEnd = deleteStart + numSymbols;
+        if (deleteEnd > main_buffer + main_buffer_size) {
+            deleteEnd = main_buffer + main_buffer_size;
+        }
+
+        // Move the text after deleteEnd to the location of deleteStart
+        memmove(deleteStart, deleteEnd, main_buffer + main_buffer_size - deleteEnd);
+
+        // Adjust the size of the main_buffer
+        main_buffer_size -= (deleteEnd - deleteStart);
+
+        // Null terminate the main_buffer
+        main_buffer[main_buffer_size] = '\0';
+
+        printf("Text deleted successfully.\n");
+
+        printf("Whole text now: %s\n", main_buffer);
+    }
+}
+
+void Main_buffer::insertText() {
+    char lineIndex[10];
+    int lineNumber, index;
+
+    // Get line number and index from the user
+    printf("Choose line and index: ");
+    fgets(lineIndex, sizeof(lineIndex), stdin);
+
+    if (sscanf(lineIndex, "%d %d", &lineNumber, &index) != 2) {
+        printf("Invalid input format. Please enter line and index as two integers.\n");
+        return;
+    }
+
+    // Navigate to the specified line
     char *lineStart = main_buffer;
     for (int i = 0; i < lineNumber; i++) {
         lineStart = strchr(lineStart, '\n');
@@ -237,35 +287,37 @@ void Main_buffer::deleteText(){
             printf("Line number exceeds the number of lines in the text.\n");
             return;
         }
-        lineStart++;  // Move past the newline character
+        lineStart++;
     }
 
-    char *deleteStart = lineStart + index;
-    if (deleteStart >= main_buffer + main_buffer_size) {
+    // Navigate to the specified index within the line
+    char *insertStart = lineStart + index;
+
+    // Ensure the insert start is within the bounds
+    if (insertStart >= main_buffer + main_buffer_size) {
         printf("Specified index is out of bounds.\n");
         return;
     }
 
-    char *deleteEnd = deleteStart + numSymbols;
-    if (deleteEnd > main_buffer + main_buffer_size) {
-        deleteEnd = main_buffer + main_buffer_size;
-    }
+    printf("Write text: ");
+    fgets(buffer, sizeof(buffer), stdin);
+    strtok(buffer, "\n"); // Remove trailing newline
 
-    // Move the text after deleteEnd to the location of deleteStart
-    memmove(deleteStart, deleteEnd, main_buffer + main_buffer_size - deleteEnd);
+    // Determine the length of the text that will be replaced
+    size_t replaceLength = strchr(insertStart, '\n') ? strchr(insertStart, '\n') - insertStart : strlen(insertStart);
 
-    // Adjust the size of the main_buffer
-    main_buffer_size -= (deleteEnd - deleteStart);
+    // Shift the remaining text
+    memmove(insertStart + strlen(buffer) - replaceLength, insertStart + replaceLength, main_buffer + main_buffer_size - (insertStart + replaceLength));
 
-    // Null terminate the main_buffer
-    main_buffer[main_buffer_size] = '\0';
+    // Insert the new text at the identified location
+    strncpy(insertStart, buffer, strlen(buffer));
 
-    printf("Text deleted successfully.\n");
-
-    printf("Whole text now: %s\n", main_buffer);
+    printf("Text replaced.\n");
 }
 
-class Program_Cycle {
+
+
+class Program {
 public:
     void run() {
         Main_buffer bufferInstance;
@@ -308,6 +360,9 @@ public:
                 case 9:
                     bufferInstance.deleteText();
                     break;
+                case 10:
+                    bufferInstance.insertText();
+                    break;
                 default:
                     break;
             }
@@ -316,7 +371,7 @@ public:
 };
 
 int main() {
-    Program_Cycle program;
+    Program program;
     program.run();
     return 0;
 };
