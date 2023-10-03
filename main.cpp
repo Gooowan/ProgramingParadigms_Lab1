@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string>
 #include <stdlib.h>
+#include <stack>
 
 using namespace std;
 
@@ -36,6 +37,22 @@ private:
     char fileName[30];
     char clipboard[100] = "";
 
+    struct Command {
+        enum CommandType {
+            Append, // 1
+            NewLine, // 2
+            Delete, // 9
+            Insert, // 6 or 10
+            Cut, // 11
+            Paste // 13
+        } type;
+        string data;
+        int position;
+    };
+
+    stack<Command> undoStack;
+    stack<Command> redoStack;
+
 public:
     Main_buffer() {}
     void appendLine();
@@ -45,41 +62,55 @@ public:
     void printingBuffer();
     void insertInText();
     void searchInText();
-    void clearingConsole();
+    static void clearingConsole();
     void deleteText();
     void insertText();
     void cut();
     void copy();
     void paste();
     char* getPosFromLineAndIndex(int a, int b);
+    void undo();
+    void redo();
 };
 
 void Main_buffer::appendLine() {
     printf("Enter text to append: ");
     fgets(buffer, sizeof(buffer), stdin);
-    strtok(buffer, "\n"); // Remove the trailing newline character
+    strtok(buffer, "\n");  // Remove the trailing newline character
+
+    // Save the state for undo
+    undoStack.push({ Command::Append, string(buffer), static_cast<int>(main_buffer_size) });
 
     size_t new_len = main_buffer_size + strlen(buffer) + 1;
     main_buffer = (char*) realloc(main_buffer, new_len);
     if (main_buffer == NULL) {
         printf("Memory allocation error\n");
+        return;
     }
+
     if (main_buffer_size == 0) {
-        strcpy(main_buffer, buffer); // If it is the first allocation, use strcpy
+        strcpy(main_buffer, buffer);  // If it's the first allocation, use strcpy
     } else {
-        strcat(main_buffer, buffer); // Append buffer to main_buffer
+        strcat(main_buffer, buffer);  // Append buffer to main_buffer
     }
     main_buffer_size = new_len;
 
     printf("Whole text now: %s\n", main_buffer);
-};
+
+    redoStack = {};  // Clear the redo stack
+}
 
 void Main_buffer::appendNewLine() {
+    // Save the state for undo
+    undoStack.push({ Command::NewLine, "\n", static_cast<int>(main_buffer_size) });
 
-    strcat(main_buffer, "\n"); // Add a new line if main_buffer is not empty,
+    strcat(main_buffer, "\n");  // Add a new line if main_buffer is not empty
+    main_buffer_size += 1;
 
-    printf("You have successfully started a new line! \n");
-};
+    printf("You have successfully started a new line!\n");
+
+    redoStack = {};  // Clear the redo stack
+}
 
 void Main_buffer::writeIntoFile() {
     printf("Enter your file name to save your buffer: ");
@@ -87,7 +118,7 @@ void Main_buffer::writeIntoFile() {
 
     char *newline = strtok(fileName, "\n");
     if (newline != nullptr) {
-        strcpy(fileName, newline); // Use strcpy instead of assignment
+        strcpy(fileName, newline);
     }
 
     inputFile = fopen(fileName, "w");
@@ -98,7 +129,7 @@ void Main_buffer::writeIntoFile() {
     } else {
         printf("Error opening file\n");
     }
-    if (main_buffer != nullptr){
+    if (main_buffer != nullptr) {
         memset(main_buffer, 0, sizeof(main_buffer));
     }
 };
@@ -106,32 +137,31 @@ void Main_buffer::writeIntoFile() {
 void Main_buffer::readingFromFile() {
     printf("Enter your file name to open: ");
     fgets(fileName, sizeof(fileName), stdin);
-    strtok(fileName, "\n"); // Remove newline character from fileName
+    strtok(fileName, "\n");
 
-    inputFile = fopen(fileName, "r"); // Open file in read mode using the user-provided fileName
+    inputFile = fopen(fileName, "r");
     if (inputFile == nullptr) {
         perror("Error opening file");
     } else {
         char tempBuffer[100];
-        // Read and append the entire file content
         while (fgets(tempBuffer, sizeof(tempBuffer), inputFile) != nullptr) {
             char *pos;
             if ((pos = strchr(tempBuffer, '\n')) != nullptr)
-                *pos = '\n'; // Replacing newline character
+                *pos = '\n';
 
-            size_t new_len = main_buffer_size + strlen(tempBuffer) + 1; // Adding 1 for the null terminator
+            size_t new_len = main_buffer_size + strlen(tempBuffer) + 1;
             char* new_buffer = (char*) realloc(main_buffer, new_len);
             if (new_buffer == nullptr) {
                 printf("Memory allocation error\n");
                 fclose(inputFile);
-                free(main_buffer); // Free the previously allocated memory
+                free(main_buffer);
             }
 
             main_buffer = new_buffer;
-            if(main_buffer_size == 0) {
-                strcpy(main_buffer, tempBuffer); // Copy buffer to main_buffer since it is the first time
+            if (main_buffer_size == 0) {
+                strcpy(main_buffer, tempBuffer);
             } else {
-                strcat(main_buffer, tempBuffer); // Append buffer to main_buffer for subsequent lines
+                strcat(main_buffer, tempBuffer);
             }
             main_buffer_size = new_len;
         }
@@ -140,11 +170,11 @@ void Main_buffer::readingFromFile() {
     }
 }
 
-void Main_buffer::printingBuffer(){
+void Main_buffer::printingBuffer() {
     printf("Current text: %s\n", main_buffer);
 }
 
-void Main_buffer::insertInText(){
+void Main_buffer::insertInText() {
     char lineIndex[10];
     int num1, num2;
 
@@ -154,49 +184,40 @@ void Main_buffer::insertInText(){
     // Parse the line and index from the input
     if (sscanf(lineIndex, "%d %d", &num1, &num2) != 2) {
         printf("Invalid input format. Please enter line and index as two integers.\n");
+        return;
     } else if (num1 < 0 || num2 < 0) {
         printf("Line and index values must be non-negative.\n");
+        return;
     } else {
-        // Check if line number exceeds the number of lines in main_buffer
-        int numLines = 0;
-        char *tempBuffer = main_buffer;
-        while (numLines < num1 && (tempBuffer = strchr(tempBuffer, '\n'))) {
-            tempBuffer++;
-            numLines++;
-        }
+        char *insertPos = getPosFromLineAndIndex(num1, num2);
+        if (!insertPos) return;
 
-        if (numLines < num1) {
-            printf("Line number exceeds the number of lines in the text.\n");
-        } else {
-            // Insert text at the specified line and index
-            if (num2 > strlen(tempBuffer)) {
-                printf("Index exceeds the length of the line.\n");
-            } else {
-                printf("Enter text to insert: ");
-                fgets(buffer, sizeof(buffer), stdin);
-                strtok(buffer, "\n"); // Remove \n
+        printf("Enter text to insert: ");
+        fgets(buffer, sizeof(buffer), stdin);
+        strtok(buffer, "\n");  // Remove the newline character
 
-                // Insert the text at the specified position
-                char *insertPosition = main_buffer + (tempBuffer - main_buffer) + num2;
-                memmove(insertPosition + strlen(buffer), insertPosition, strlen(insertPosition) + 1);
-                strncpy(insertPosition, buffer, strlen(buffer));
-                printf("Text inserted.\n");
-            }
-        }
+        // Save the state for undo
+        undoStack.push({ Command::Insert, string(buffer), static_cast<int>(insertPos - main_buffer) });
+
+        // Insert the text at the specified position
+        memmove(insertPos + strlen(buffer), insertPos, strlen(insertPos) + 1);
+        strncpy(insertPos, buffer, strlen(buffer));
+
+        printf("Text inserted.\n");
+
+        redoStack = {};  // Clear the redo stack
     }
 }
 
-void Main_buffer::searchInText(){
+void Main_buffer::searchInText() {
     printf("Enter word to find: ");
     fgets(buffer, sizeof(buffer), stdin);
-    strtok(buffer, "\n"); // Remove the trailing newline character
+    strtok(buffer, "\n");
 
     char *searchPosition = main_buffer;
     int found = 0;
 
-    // Loop to search for the word in the main_buffer
     while ((searchPosition = strstr(searchPosition, buffer)) != NULL) {
-        // Count the line number
         int lineCount = 1;
         for (char *ptr = main_buffer; ptr < searchPosition; ptr++) {
             if (*ptr == '\n') {
@@ -204,8 +225,7 @@ void Main_buffer::searchInText(){
             }
         }
 
-        printf("Word found at position: %d, on line: %d\n", (int) (searchPosition - main_buffer),
-               lineCount);
+        printf("Word found at position: %d, on line: %d\n", (int)(searchPosition - main_buffer), lineCount);
         found = 1;
 
         searchPosition++;
@@ -216,11 +236,11 @@ void Main_buffer::searchInText(){
     }
 }
 
-void Main_buffer::clearingConsole(){
+void Main_buffer::clearingConsole() {
     system("clear");
 }
 
-void Main_buffer::deleteText(){
+void Main_buffer::deleteText() {
     char lineIndex[10];
     int lineNumber, index, numSymbols;
 
@@ -228,40 +248,36 @@ void Main_buffer::deleteText(){
     printf("Enter line number, index, number of symbols to delete : ");
     fgets(lineIndex, sizeof(lineIndex), stdin);
 
-    // Parse the line and index from the input
     if (sscanf(lineIndex, "%d %d %d", &lineNumber, &index, &numSymbols) != 3) {
         printf("Invalid input format. Please enter line and index as two integers.\n");
-    } else if (lineNumber < 0 || index < 0 || numSymbols < 0) {
-        printf("Line and index values must be non-negative.\n");
-    } else {
-
-        char *lineStart = getPosFromLineAndIndex(lineNumber, index);
-        if (!lineStart) return;
-
-        char *deleteStart = lineStart + index;
-        if (deleteStart >= main_buffer + main_buffer_size) {
-            printf("Specified index is out of bounds.\n");
-            return;
-        }
-
-        char *deleteEnd = deleteStart + numSymbols;
-        if (deleteEnd > main_buffer + main_buffer_size) {
-            deleteEnd = main_buffer + main_buffer_size;
-        }
-
-        // Move the text after deleteEnd to the location of deleteStart
-        memmove(deleteStart, deleteEnd, main_buffer + main_buffer_size - deleteEnd);
-
-        // Adjust the size of the main_buffer
-        main_buffer_size -= (deleteEnd - deleteStart);
-
-        // Null terminate the main_buffer
-        main_buffer[main_buffer_size] = '\0';
-
-        printf("Text deleted successfully.\n");
-
-        printf("Whole text now: %s\n", main_buffer);
+        return;
     }
+
+    char *startPos = getPosFromLineAndIndex(lineNumber, index);
+    if (!startPos) return;
+
+    char *endPos = startPos + numSymbols;
+    if (endPos > main_buffer + main_buffer_size) {
+        endPos = main_buffer + main_buffer_size;
+    }
+
+    // Save the state for undo
+    string dataDeleted(startPos, endPos);
+    undoStack.push({ Command::Delete, dataDeleted, static_cast<int>(startPos - main_buffer) });
+
+    // Move the text after endPos to the location of startPos
+    memmove(startPos, endPos, main_buffer + main_buffer_size - endPos);
+
+    // Adjust the size of the main_buffer
+    main_buffer_size -= (endPos - startPos);
+
+    // Null terminate the main_buffer
+    main_buffer[main_buffer_size] = '\0';
+
+    printf("Text deleted successfully.\n");
+    printf("Whole text now: %s\n", main_buffer);
+
+    redoStack = {};  // Clear the redo stack
 }
 
 void Main_buffer::insertText() {
@@ -277,23 +293,23 @@ void Main_buffer::insertText() {
         return;
     }
 
-    char *insertStart = getPosFromLineAndIndex(lineNumber, index);
-    if (!insertStart) return;
+    char *insertPos = getPosFromLineAndIndex(lineNumber, index);
+    if (!insertPos) return;
 
     printf("Write text: ");
     fgets(buffer, sizeof(buffer), stdin);
     strtok(buffer, "\n"); // Remove trailing newline
 
-    // Determine the length of the text that will be replaced
-    size_t replaceLength = strchr(insertStart, '\n') ? strchr(insertStart, '\n') - insertStart : strlen(insertStart);
+    // Save the state for undo
+    undoStack.push({ Command::Insert, string(buffer), static_cast<int>(insertPos - main_buffer) });
 
-    // Shift the remaining text
-    memmove(insertStart + strlen(buffer) - replaceLength, insertStart + replaceLength, main_buffer + main_buffer_size - (insertStart + replaceLength));
+    // Move the remaining text in main_buffer to make space for the insert
+    memmove(insertPos + strlen(buffer), insertPos, main_buffer + main_buffer_size - insertPos);
+    strncpy(insertPos, buffer, strlen(buffer));
 
-    // Insert the new text at the identified location
-    strncpy(insertStart, buffer, strlen(buffer));
+    printf("Text inserted.\n");
 
-    printf("Text replaced.\n");
+    redoStack = {};  // Clear the redo stack
 }
 
 void Main_buffer::cut() {
@@ -314,9 +330,15 @@ void Main_buffer::cut() {
     strncpy(clipboard, startPos, numSymbols);
     clipboard[numSymbols] = '\0';  // Null-terminate clipboard
 
+    // Save the state for undo
+    undoStack.push({ Command::Cut, string(clipboard), static_cast<int>(startPos - main_buffer) });
+
     // Shift the remaining text in the main_buffer to delete the cut portion
     memmove(startPos, startPos + numSymbols, strlen(startPos + numSymbols) + 1);
+
     printf("Text cut to clipboard: %s\n", clipboard);
+
+    redoStack = {};  // Clear the redo stack
 }
 
 void Main_buffer::copy() {
@@ -335,7 +357,7 @@ void Main_buffer::copy() {
     if (!startPos) return;
 
     strncpy(clipboard, startPos, numSymbols);
-    clipboard[numSymbols] = '\0';  // Null-terminate clipboard
+    clipboard[numSymbols] = '\0';
 
     printf("Text copied to clipboard: %s\n", clipboard);
 }
@@ -355,11 +377,16 @@ void Main_buffer::paste() {
     char *insertPos = getPosFromLineAndIndex(lineNumber, index);
     if (!insertPos) return;
 
+    // Save the state for undo
+    undoStack.push({ Command::Paste, string(clipboard), static_cast<int>(insertPos - main_buffer) });
+
     // Move the remaining text in main_buffer to make space for the paste
     memmove(insertPos + strlen(clipboard), insertPos, strlen(insertPos) + 1);
     strncpy(insertPos, clipboard, strlen(clipboard));
 
     printf("Text pasted from clipboard: %s\n", clipboard);
+
+    redoStack = {};  // Clear the redo stack
 }
 
 char *Main_buffer::getPosFromLineAndIndex(int lineNumber, int index) {
@@ -383,18 +410,113 @@ char *Main_buffer::getPosFromLineAndIndex(int lineNumber, int index) {
 }
 
 
+void Main_buffer::undo() {
+    if (undoStack.empty()) {
+        printf("Nothing to undo.\n");
+        return;
+    }
+
+    Command cmd = undoStack.top();
+    undoStack.pop();
+
+    switch (cmd.type) {
+        case Command::Append:
+            main_buffer[cmd.position] = '\0';
+            main_buffer_size = cmd.position;
+            redoStack.push({ Command::Delete, cmd.data, cmd.position });
+            break;
+
+        case Command::NewLine:
+            if (cmd.position > 0 && main_buffer[cmd.position - 1] == '\n') {
+                main_buffer[cmd.position - 1] = '\0';
+                main_buffer_size--;
+                redoStack.push({ Command::Delete, "\n", cmd.position - 1 });
+            }
+            break;
+
+        case Command::Delete:
+            strcpy(main_buffer + cmd.position, cmd.data.c_str());
+            main_buffer_size += cmd.data.length();
+            redoStack.push({ Command::Append, cmd.data, cmd.position });
+            break;
+
+        case Command::Insert:
+            main_buffer[cmd.position] = '\0';
+            main_buffer_size = cmd.position;
+            redoStack.push({ Command::Delete, cmd.data, cmd.position });
+            break;
+
+        case Command::Cut:
+            strcpy(main_buffer + cmd.position, cmd.data.c_str());
+            main_buffer_size += cmd.data.length();
+            redoStack.push({ Command::Append, cmd.data, cmd.position });
+            break;
+
+        default:
+            break;
+    }
+
+    printf("Undo executed.\n");
+}
+
+void Main_buffer::redo() {
+    if (redoStack.empty()) {
+        printf("Nothing to redo.\n");
+        return;
+    }
+
+    Command cmd = redoStack.top();
+    redoStack.pop();
+
+    switch (cmd.type) {
+        case Command::Append:
+            strcpy(main_buffer + cmd.position, cmd.data.c_str());
+            main_buffer_size += cmd.data.length();
+            undoStack.push({ Command::Delete, cmd.data, cmd.position });
+            break;
+
+        case Command::NewLine:
+            main_buffer[cmd.position] = '\n';
+            main_buffer_size++;
+            undoStack.push({ Command::Delete, "\n", cmd.position });
+            break;
+
+        case Command::Delete:
+            main_buffer[cmd.position] = '\0';
+            main_buffer_size = cmd.position;
+            undoStack.push({ Command::Append, cmd.data, cmd.position });
+            break;
+
+        case Command::Insert:
+            strcpy(main_buffer + cmd.position, cmd.data.c_str());
+            main_buffer_size += cmd.data.length();
+            undoStack.push({ Command::Delete, cmd.data, cmd.position });
+            break;
+
+        case Command::Cut:
+            main_buffer[cmd.position] = '\0';
+            main_buffer_size = cmd.position;
+            undoStack.push({ Command::Append, cmd.data, cmd.position });
+            break;
+
+        default:
+            break;
+    }
+
+    printf("Redo executed.\n");
+}
+
 class Program {
 public:
     void run() {
         Main_buffer bufferInstance;
         int choice;
 
-
         do {
             printf("Enter the command: ");
             choice = User_Input::getIntChoice();
 
-            if (choice < 1 || choice > 13) {
+            if (choice < 1 || choice > 15) {
                 printf("Invalid input. Please enter a valid integer between 1 and 9.\n");
                 continue;
             }
@@ -438,6 +560,12 @@ public:
                     break;
                 case 13:
                     bufferInstance.paste();
+                    break;
+                case 14:
+                    bufferInstance.undo();
+                    break;
+                case 15:
+                    bufferInstance.redo();
                     break;
                 default:
                     break;
