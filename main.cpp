@@ -1,9 +1,73 @@
-#include <stdio.h>
-#include <string>
-#include <stdlib.h>
-#include <stack>
+// exe to render g++ main.cpp -std=c++11 -o program
 
+#include <cstdio>
+#include <string>
+#include <cstdlib>
+#include <stack>
+#include <iostream>
+#include <dlfcn.h>
+#include <fstream>
+#include <limits>
+#include <stdexcept>
 using namespace std;
+
+char* encrypt(const char*, int);
+char* decrypt(const char*, int);
+const int chunksize = 256;
+
+class IReader {
+public:
+    virtual ~IReader() noexcept {}
+    virtual string read() = 0;
+};
+
+class FileReader: public IReader {
+private:
+    string filepath;
+
+public:
+    FileReader(const string& path) : filepath(path) {}
+
+    string read() {
+        ifstream file(filepath);
+        if (!file.is_open()) {
+            throw runtime_error("Error: File does not exist or cannot be opened.");
+        }
+
+        string content((istreambuf_iterator<char>(file)), istreambuf_iterator<char>());
+        file.close();
+        return content;
+    }
+};
+
+class IWriter {
+public:
+    virtual ~IWriter() noexcept {}
+    virtual void write(const string& content) = 0;
+};
+
+class FileWriter: public IWriter {
+private:
+    string filepath;
+
+public:
+    FileWriter(const string& path) : filepath(path) {}
+
+    void write(const string& content) {
+        ofstream file(filepath, ios::binary);
+        if (!file.is_open()) {
+            throw runtime_error("Error: File cannot be written.");
+        }
+
+        size_t pos = 0;
+        while (pos < content.size()) {
+            size_t chunk_length = min(chunksize, static_cast<int>(content.size() - pos));
+            file.write(content.data() + pos, chunk_length);
+            pos += chunk_length;
+        }
+        file.close();
+    }
+};
 
 class User_Input {
 public:
@@ -53,8 +117,44 @@ private:
     stack<Command> undoStack;
     stack<Command> redoStack;
 
+    void* lib = nullptr;
+    char* (*encryptFunc)(const char*, int) = nullptr;
+    char* (*decryptFunc)(const char*, int) = nullptr;
+
+    bool loadLibrary() {
+        lib = dlopen("./caesar_cipher.dylib", RTLD_LAZY);
+        if (!lib) {
+            cout << "Error loading the library: " << dlerror() << endl;
+            return false;
+        }
+
+        encryptFunc = reinterpret_cast<char* (*)(const char*, int)>(dlsym(lib, "encrypt"));
+        decryptFunc = reinterpret_cast<char* (*)(const char*, int)>(dlsym(lib, "decrypt"));
+
+        if (!encryptFunc || !decryptFunc) {
+            cout << "Error loading functions: " << dlerror() << endl;
+            dlclose(lib);
+            return false;
+        }
+        return true;
+    }
+
+
 public:
-    Main_buffer() {}
+
+
+    Main_buffer() {
+        if (!loadLibrary()) {
+            cout << "Failed to load the encryption library." << endl;
+        }
+    }
+
+    ~Main_buffer() {
+        if (lib) {
+            dlclose(lib);
+        }
+    }
+
     void appendLine();
     void appendNewLine();
     void writeIntoFile();
@@ -71,12 +171,14 @@ public:
     char* getPosFromLineAndIndex(int a, int b);
     void undo();
     void redo();
+    void encrypt();
+    void decrypt();
 };
 
 void Main_buffer::appendLine() {
     printf("Enter text to append: ");
     fgets(buffer, sizeof(buffer), stdin);
-    strtok(buffer, "\n");  // Remove the trailing newline character
+    strtok(buffer, "\n");
 
     // Save the state for undo
     undoStack.push({ Command::Append, string(buffer), static_cast<int>(main_buffer_size) });
@@ -421,35 +523,42 @@ void Main_buffer::undo() {
 
     switch (cmd.type) {
         case Command::Append:
+        case Command::Insert:
+        {
+            int len = cmd.data.length();
+            main_buffer_size -= len;
             main_buffer[cmd.position] = '\0';
-            main_buffer_size = cmd.position;
-            redoStack.push({ Command::Delete, cmd.data, cmd.position });
-            break;
-
-        case Command::NewLine:
-            if (cmd.position > 0 && main_buffer[cmd.position - 1] == '\n') {
-                main_buffer[cmd.position - 1] = '\0';
-                main_buffer_size--;
-                redoStack.push({ Command::Delete, "\n", cmd.position - 1 });
-            }
+            redoStack.push({ Command::Insert, cmd.data, cmd.position });
+        }
             break;
 
         case Command::Delete:
-            strcpy(main_buffer + cmd.position, cmd.data.c_str());
-            main_buffer_size += cmd.data.length();
-            redoStack.push({ Command::Append, cmd.data, cmd.position });
-            break;
-
-        case Command::Insert:
-            main_buffer[cmd.position] = '\0';
-            main_buffer_size = cmd.position;
+        {
+            int len = cmd.data.length();
+            memmove(main_buffer + cmd.position + len, main_buffer + cmd.position, main_buffer_size - cmd.position);
+            strncpy(main_buffer + cmd.position, cmd.data.c_str(), len);
+            main_buffer_size += len;
             redoStack.push({ Command::Delete, cmd.data, cmd.position });
+        }
             break;
 
         case Command::Cut:
-            strcpy(main_buffer + cmd.position, cmd.data.c_str());
-            main_buffer_size += cmd.data.length();
-            redoStack.push({ Command::Append, cmd.data, cmd.position });
+        {
+            int len = cmd.data.length();
+            memmove(main_buffer + cmd.position + len, main_buffer + cmd.position, main_buffer_size - cmd.position);
+            strncpy(main_buffer + cmd.position, cmd.data.c_str(), len);
+            main_buffer_size += len;
+            redoStack.push({ Command::Cut, cmd.data, cmd.position });
+        }
+            break;
+
+        case Command::Paste:
+        {
+            int len = cmd.data.length();
+            main_buffer_size -= len;
+            main_buffer[cmd.position] = '\0';
+            redoStack.push({ Command::Paste, cmd.data, cmd.position });
+        }
             break;
 
         default:
@@ -457,6 +566,7 @@ void Main_buffer::undo() {
     }
 
     printf("Undo executed.\n");
+
 }
 
 void Main_buffer::redo() {
@@ -469,34 +579,28 @@ void Main_buffer::redo() {
     redoStack.pop();
 
     switch (cmd.type) {
-        case Command::Append:
-            strcpy(main_buffer + cmd.position, cmd.data.c_str());
-            main_buffer_size += cmd.data.length();
+        case Command::Insert:
+        case Command::Paste:
+        {
+            int len = cmd.data.length();
+            main_buffer = (char*)realloc(main_buffer, main_buffer_size + len + 1);
+            memmove(main_buffer + cmd.position + len, main_buffer + cmd.position, main_buffer_size - cmd.position);
+            strncpy(main_buffer + cmd.position, cmd.data.c_str(), len);
+            main_buffer_size += len;
+            // Terminate the string
+            main_buffer[main_buffer_size] = '\0';
             undoStack.push({ Command::Delete, cmd.data, cmd.position });
-            break;
-
-        case Command::NewLine:
-            main_buffer[cmd.position] = '\n';
-            main_buffer_size++;
-            undoStack.push({ Command::Delete, "\n", cmd.position });
+        }
             break;
 
         case Command::Delete:
-            main_buffer[cmd.position] = '\0';
-            main_buffer_size = cmd.position;
-            undoStack.push({ Command::Append, cmd.data, cmd.position });
-            break;
-
-        case Command::Insert:
-            strcpy(main_buffer + cmd.position, cmd.data.c_str());
-            main_buffer_size += cmd.data.length();
-            undoStack.push({ Command::Delete, cmd.data, cmd.position });
-            break;
-
         case Command::Cut:
+        {
+            int len = cmd.data.length();
+            main_buffer_size -= len;
             main_buffer[cmd.position] = '\0';
-            main_buffer_size = cmd.position;
-            undoStack.push({ Command::Append, cmd.data, cmd.position });
+            undoStack.push({ Command::Insert, cmd.data, cmd.position });
+        }
             break;
 
         default:
@@ -505,6 +609,40 @@ void Main_buffer::redo() {
 
     printf("Redo executed.\n");
 }
+
+void Main_buffer::encrypt() {
+    if (main_buffer != nullptr && encryptFunc){
+        int key;
+        cout << "Enter an encryption key: ";
+        cin >> key;
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        char* encryptedText = encryptFunc(main_buffer, key);
+        if (encryptedText) {
+            strcpy(main_buffer, encryptedText);
+            free(encryptedText);  // assuming the library allocates memory
+            cout << "Encrypted: " << main_buffer << endl;
+        }
+    }
+    else {
+        cout << "Nothing in buffer or encryption function not loaded." << endl;
+    }
+}
+
+void Main_buffer::decrypt() {
+    if (main_buffer != nullptr && decryptFunc){
+        int key;
+        cout << "Enter an encryption key: ";
+        cin >> key;
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        char* decryptedText = decryptFunc(main_buffer, key);
+        if (decryptedText) {
+            strcpy(main_buffer, decryptedText);
+            free(decryptedText);  // assuming the library allocates memory
+            cout << "Decrypted: " << main_buffer << endl;
+        }
+    }
+}
+
 
 class Program {
 public:
@@ -516,7 +654,7 @@ public:
             printf("Enter the command: ");
             choice = User_Input::getIntChoice();
 
-            if (choice < 1 || choice > 15) {
+            if (choice < 1 || choice > 17) {
                 printf("Invalid input. Please enter a valid integer between 1 and 9.\n");
                 continue;
             }
@@ -566,6 +704,12 @@ public:
                     break;
                 case 15:
                     bufferInstance.redo();
+                    break;
+                case 16:
+                    bufferInstance.encrypt();
+                    break;
+                case 17:
+                    bufferInstance.decrypt();
                     break;
                 default:
                     break;
