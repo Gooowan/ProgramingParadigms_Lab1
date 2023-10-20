@@ -11,9 +11,75 @@
 #include <stdexcept>
 using namespace std;
 
-char* encrypt(const char*, int);
-char* decrypt(const char*, int);
+//char* encrypt(const char*, int);
+//char* decrypt(const char*, int);
 const int chunksize = 256;
+
+class Caesar {
+private:
+    void* lib = nullptr;
+    char* (*encryptFunc)(const char*, int) = nullptr;
+    char* (*decryptFunc)(const char*, int) = nullptr;
+
+    bool loadLibrary() {
+        if (lib) {
+            dlclose(lib);
+            lib = nullptr;
+            encryptFunc = nullptr;
+            decryptFunc = nullptr;
+        }
+
+        lib = dlopen("./caesar_cipher.dylib", RTLD_LAZY);
+        if (!lib) {
+            cout << "Error loading the library: " << dlerror() << endl;
+            return false;
+        }
+
+        encryptFunc = reinterpret_cast<char* (*)(const char*, int)>(dlsym(lib, "encrypt"));
+        decryptFunc = reinterpret_cast<char* (*)(const char*, int)>(dlsym(lib, "decrypt"));
+
+        if (!encryptFunc || !decryptFunc) {
+            cout << "Error loading functions: " << dlerror() << endl;
+            dlclose(lib);
+            return false;
+        }
+        return true;
+    }
+
+public:
+    char* encrypt(uint8_t* data, int size);
+    char* decrypt(uint8_t* data, int size);
+};
+
+char* Caesar::encrypt(uint8_t* data, int size) {
+    if (!loadLibrary()) {
+        cout << "Failed to load the encryption library." << endl;
+        return nullptr;
+    }
+
+    int key;
+    cout << "Enter an encryption key: ";
+    cin >> key;
+    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+    char* encryptedText = encryptFunc(reinterpret_cast<const char*>(data), key);
+    dlclose(lib);  // close the library after using the function
+    return encryptedText;
+}
+
+char* Caesar::decrypt(uint8_t* data, int size) {
+    if (!loadLibrary()) {
+        cout << "Failed to load the decryption library." << endl;
+        return nullptr;
+    }
+
+    int key;
+    cout << "Enter the decryption key: ";
+    cin >> key;
+    cin.ignore(numeric_limits<streamsize>::max(), '\n');
+    char* decryptedText = decryptFunc(reinterpret_cast<const char*>(data), key);
+    dlclose(lib);  // close the library after using the function
+    return decryptedText;
+}
 
 class IReader {
 public:
@@ -215,60 +281,40 @@ void Main_buffer::appendNewLine() {
 }
 
 void Main_buffer::writeIntoFile() {
+    char fileName[30];
     printf("Enter your file name to save your buffer: ");
     fgets(fileName, sizeof(fileName), stdin);
+    strtok(fileName, "\n");
 
-    char *newline = strtok(fileName, "\n");
-    if (newline != nullptr) {
-        strcpy(fileName, newline);
-    }
-
-    inputFile = fopen(fileName, "w");
-    if (inputFile != nullptr) {
-        fputs(main_buffer, inputFile);
-        fclose(inputFile);
+    FileWriter writer(fileName);
+    try {
+        writer.write(string(main_buffer));
         printf("Saved successfully\n");
-    } else {
-        printf("Error opening file\n");
+    } catch (const runtime_error& e) {
+        cout << e.what() << endl;
     }
+
     if (main_buffer != nullptr) {
         memset(main_buffer, 0, sizeof(main_buffer));
     }
-};
+}
 
 void Main_buffer::readingFromFile() {
+    char fileName[30];
     printf("Enter your file name to open: ");
     fgets(fileName, sizeof(fileName), stdin);
     strtok(fileName, "\n");
 
-    inputFile = fopen(fileName, "r");
-    if (inputFile == nullptr) {
-        perror("Error opening file");
-    } else {
-        char tempBuffer[100];
-        while (fgets(tempBuffer, sizeof(tempBuffer), inputFile) != nullptr) {
-            char *pos;
-            if ((pos = strchr(tempBuffer, '\n')) != nullptr)
-                *pos = '\n';
+    FileReader reader(fileName);
+    try {
+        string content = reader.read();
+        main_buffer = (char*)realloc(main_buffer, content.size() + 1);
+        strcpy(main_buffer, content.c_str());
+        main_buffer_size = content.size();
 
-            size_t new_len = main_buffer_size + strlen(tempBuffer) + 1;
-            char* new_buffer = (char*) realloc(main_buffer, new_len);
-            if (new_buffer == nullptr) {
-                printf("Memory allocation error\n");
-                fclose(inputFile);
-                free(main_buffer);
-            }
-
-            main_buffer = new_buffer;
-            if (main_buffer_size == 0) {
-                strcpy(main_buffer, tempBuffer);
-            } else {
-                strcat(main_buffer, tempBuffer);
-            }
-            main_buffer_size = new_len;
-        }
-        fclose(inputFile);
         printf("File content appended to main_buffer.\n");
+    } catch (const runtime_error& e) {
+        cout << e.what() << endl;
     }
 }
 
@@ -611,35 +657,26 @@ void Main_buffer::redo() {
 }
 
 void Main_buffer::encrypt() {
-    if (main_buffer != nullptr && encryptFunc){
-        int key;
-        cout << "Enter an encryption key: ";
-        cin >> key;
-        cin.ignore(numeric_limits<streamsize>::max(), '\n');
-        char* encryptedText = encryptFunc(main_buffer, key);
-        if (encryptedText) {
-            strcpy(main_buffer, encryptedText);
-            free(encryptedText);  // assuming the library allocates memory
-            cout << "Encrypted: " << main_buffer << endl;
-        }
-    }
-    else {
-        cout << "Nothing in buffer or encryption function not loaded." << endl;
+    Caesar cipher;
+    char* encryptedText = cipher.encrypt(reinterpret_cast<uint8_t*>(main_buffer), main_buffer_size);
+    if (encryptedText) {
+        strcpy(main_buffer, encryptedText);
+        free(encryptedText);
+        cout << "Encrypted: " << main_buffer << endl;
+    } else {
+        cout << "Encryption failed." << endl;
     }
 }
 
 void Main_buffer::decrypt() {
-    if (main_buffer != nullptr && decryptFunc){
-        int key;
-        cout << "Enter an encryption key: ";
-        cin >> key;
-        cin.ignore(numeric_limits<streamsize>::max(), '\n');
-        char* decryptedText = decryptFunc(main_buffer, key);
-        if (decryptedText) {
-            strcpy(main_buffer, decryptedText);
-            free(decryptedText);  // assuming the library allocates memory
-            cout << "Decrypted: " << main_buffer << endl;
-        }
+    Caesar cipher;
+    char* decryptedText = cipher.decrypt(reinterpret_cast<uint8_t*>(main_buffer), main_buffer_size);
+    if (decryptedText) {
+        strcpy(main_buffer, decryptedText);
+        free(decryptedText);
+        cout << "Decrypted: " << main_buffer << endl;
+    } else {
+        cout << "Decryption failed." << endl;
     }
 }
 
@@ -723,3 +760,4 @@ int main() {
     program.run();
     return 0;
 };
+
