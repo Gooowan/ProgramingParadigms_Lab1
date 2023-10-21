@@ -4,15 +4,14 @@
 #include <cstring>
 using namespace std;
 
-extern "C" char* encrypt(const char* rawText, int key) {
-    size_t length = strlen(rawText);
-    char* encryptedText = new char[length + 1];
+extern "C" char* encrypt(const char* rawText, int size, int key) {
+    char* encryptedText = new char[size + 1];
     key = ((key % 26) + 26) % 26;
     cout << "key: " << key << endl;
-    for (size_t i = 0; i < length; i++) {
+
+    for (int i = 0; i < size; i++) {
         char originalChar = rawText[i];
         char encryptedChar = originalChar;
-
 
         if (originalChar >= 'a' && originalChar <= 'z') {
             encryptedChar = 'a' + (originalChar - 'a' + key) % 26;
@@ -22,21 +21,19 @@ extern "C" char* encrypt(const char* rawText, int key) {
 
         encryptedText[i] = encryptedChar;
     }
-    encryptedText[length] = '\0';
+    encryptedText[size] = '\0';
 
     return encryptedText;
 }
 
-extern "C" char* decrypt(const char* encryptedText, int key) {
-    size_t length = strlen(encryptedText);
-    char* decryptedText = new char[length + 1];
+extern "C" char* decrypt(const char* encryptedText, int size, int key) {
+    char* decryptedText = new char[size + 1];
     key = ((key % 26) + 26) % 26;
     cout << "key: " << key << endl;
 
-    for (size_t i = 0; i < length; i++) {
+    for (int i = 0; i < size; i++) {
         char encryptedChar = encryptedText[i];
         char decryptedChar = encryptedChar;
-
 
         if (encryptedChar >= 'a' && encryptedChar <= 'z') {
             decryptedChar = 'a' + (encryptedChar - 'a' - key + 26) % 26;
@@ -46,7 +43,7 @@ extern "C" char* decrypt(const char* encryptedText, int key) {
 
         decryptedText[i] = decryptedChar;
     }
-    decryptedText[length] = '\0';
+    decryptedText[size] = '\0';
 
     return decryptedText;
 }
