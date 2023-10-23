@@ -12,13 +12,13 @@
 using namespace std;
 
 
-const int chunksize = 256;
+const int chunksize = 64;
 
 class Caesar {
 private:
     void* lib = nullptr;
-    char* (*encryptFunc)(const char*, int, int) = nullptr;
-    char* (*decryptFunc)(const char*, int, int) = nullptr;
+    char* (*encryptFunc)(const char*, int, int, int) = nullptr;
+    char* (*decryptFunc)(const char*, int, int, int) = nullptr;
 
     bool loadLibrary() {
         if (lib) {
@@ -28,14 +28,14 @@ private:
             decryptFunc = nullptr;
         }
 
-        lib = dlopen("./caesar_cipher.dylib", RTLD_LAZY);
+        lib = dlopen("./caesar_cipher_updated.dylib", RTLD_LAZY);
         if (!lib) {
             std::cout << "Error loading the library: " << dlerror() << std::endl;
             return false;
         }
 
-        encryptFunc = reinterpret_cast<char* (*)(const char*, int, int)>(dlsym(lib, "encrypt"));
-        decryptFunc = reinterpret_cast<char* (*)(const char*, int, int)>(dlsym(lib, "decrypt"));
+        encryptFunc = reinterpret_cast<char* (*)(const char*, int, int, int)>(dlsym(lib, "encrypt"));
+        decryptFunc = reinterpret_cast<char* (*)(const char*, int, int, int)>(dlsym(lib, "decrypt"));
 
         if (!encryptFunc || !decryptFunc) {
             std::cout << "Error loading functions: " << dlerror() << std::endl;
@@ -46,6 +46,8 @@ private:
     }
 
 public:
+
+
     char* encrypt(void* data, int size);
     char* decrypt(void* data, int size);
 };
@@ -60,7 +62,7 @@ char* Caesar::encrypt(void* data, int size) {
     std::cout << "Enter an encryption key: ";
     std::cin >> key;
     std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-    char* encryptedText = encryptFunc(reinterpret_cast<const char*>(data), size, key);
+    char* encryptedText = encryptFunc(reinterpret_cast<const char*>(data), size, key, chunksize);
     dlclose(lib);  // close the library after using the function
     return encryptedText;
 }
@@ -75,7 +77,7 @@ char* Caesar::decrypt(void* data, int size) {
     std::cout << "Enter the decryption key: ";
     std::cin >> key;
     std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-    char* decryptedText = decryptFunc(reinterpret_cast<const char*>(data), size, key);
+    char* decryptedText = decryptFunc(reinterpret_cast<const char*>(data), size, key, chunksize);
     dlclose(lib);  // close the library after using the function
     return decryptedText;
 }
@@ -182,42 +184,18 @@ private:
     stack<Command> undoStack;
     stack<Command> redoStack;
 
-    void* lib = nullptr;
-    char* (*encryptFunc)(const char*, int) = nullptr;
-    char* (*decryptFunc)(const char*, int) = nullptr;
 
-    bool loadLibrary() {
-        lib = dlopen("./caesar_cipher.dylib", RTLD_LAZY);
-        if (!lib) {
-            cout << "Error loading the library: " << dlerror() << endl;
-            return false;
-        }
-
-        encryptFunc = reinterpret_cast<char* (*)(const char*, int)>(dlsym(lib, "encrypt"));
-        decryptFunc = reinterpret_cast<char* (*)(const char*, int)>(dlsym(lib, "decrypt"));
-
-        if (!encryptFunc || !decryptFunc) {
-            cout << "Error loading functions: " << dlerror() << endl;
-            dlclose(lib);
-            return false;
-        }
-        return true;
-    }
 
 
 public:
 
 
     Main_buffer() {
-        if (!loadLibrary()) {
-            cout << "Failed to load the encryption library." << endl;
-        }
+
     }
 
     ~Main_buffer() {
-        if (lib) {
-            dlclose(lib);
-        }
+
     }
 
     void appendLine();
@@ -657,10 +635,10 @@ void Main_buffer::redo() {
 
 void Main_buffer::encrypt() {
     Caesar cipher;
-    char* encryptedText = cipher.encrypt(reinterpret_cast<uint8_t*>(main_buffer), main_buffer_size);
+    char* encryptedText = cipher.encrypt(main_buffer, main_buffer_size);
     if (encryptedText) {
         strcpy(main_buffer, encryptedText);
-        free(encryptedText);
+        delete[] encryptedText;
         cout << "Encrypted: " << main_buffer << endl;
     } else {
         cout << "Encryption failed." << endl;
@@ -669,15 +647,16 @@ void Main_buffer::encrypt() {
 
 void Main_buffer::decrypt() {
     Caesar cipher;
-    char* decryptedText = cipher.decrypt(reinterpret_cast<uint8_t*>(main_buffer), main_buffer_size);
+    char* decryptedText = cipher.decrypt(main_buffer, main_buffer_size);
     if (decryptedText) {
         strcpy(main_buffer, decryptedText);
-        free(decryptedText);
+        delete[] decryptedText;
         cout << "Decrypted: " << main_buffer << endl;
     } else {
         cout << "Decryption failed." << endl;
     }
 }
+
 
 
 class Program {
