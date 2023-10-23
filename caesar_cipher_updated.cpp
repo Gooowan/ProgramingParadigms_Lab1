@@ -20,9 +20,9 @@ extern "C" char* encrypt(const char* rawText, int size, int key, int chunkSize) 
         }
 
         encryptedText[i] = encryptedChar;
-//        for (int j = 1; j < chunkSize && (i + j) < size; j++) {
-//            encryptedText[i + j] = rawText[i + j];
-//        }
+        for (int j = 0; j < size; j++) {
+            encryptedText[chunkSize + j] = rawText[chunkSize + j];
+        }
     }
 
     encryptedText[size] = '\0';
